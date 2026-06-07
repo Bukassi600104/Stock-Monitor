@@ -1,0 +1,163 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Stock {
+  id               String          @id @default(cuid())
+  symbol           String          @unique
+  company          String
+  sector           String
+  price            Float
+  change           Float
+  volume           Int
+  marketCap        Float
+  dividendYield    Float
+  pe               Float
+  roe              Float
+  payoutRatio      Float
+  opportunityScore Int
+  dividendScore    Int
+  valuationScore   Int
+  liquidityScore   Int
+  riskScore        Int
+  riskLevel        String
+  label            String
+  reason           String
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  snapshots        PriceSnapshot[]
+  dividends        Dividend[]
+  watchlistItems   WatchlistItem[]
+  holdings         Holding[]
+  alerts           Alert[]
+}
+
+model PriceSnapshot {
+  id        String   @id @default(cuid())
+  stockId   String
+  stock     Stock    @relation(fields: [stockId], references: [id])
+  price     Float
+  change    Float
+  volume    Int
+  source    String
+  capturedAt DateTime @default(now())
+}
+
+model Dividend {
+  id                String   @id @default(cuid())
+  stockId           String
+  stock             Stock    @relation(fields: [stockId], references: [id])
+  dividendYear      Int
+  dividendType      String
+  dividendPerShare  Float
+  qualificationDate DateTime?
+  exDividendDate    DateTime?
+  paymentDate       DateTime?
+  status            String
+}
+
+model WatchlistItem {
+  id          String   @id @default(cuid())
+  stockId     String
+  stock       Stock    @relation(fields: [stockId], references: [id])
+  targetPrice Float?
+  note        String
+  createdAt   DateTime @default(now())
+}
+
+model BrokerSetup {
+  id                    String   @id @default(cuid())
+  brokerName            String   @default("Stanbic IBTC Stockbrokers")
+  accountNickname       String?
+  brokerageAccountNo    String?
+  cscsNumber            String?
+  chn                   String?
+  contactEmail          String?
+  contactPhone          String?
+  notes                 String?
+  checklistJson         String
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  holdings              Holding[]
+  transactions          Transaction[]
+  documents             Document[]
+}
+
+model Holding {
+  id                       String        @id @default(cuid())
+  stockId                  String?
+  stock                    Stock?        @relation(fields: [stockId], references: [id])
+  brokerSetupId            String
+  brokerSetup              BrokerSetup   @relation(fields: [brokerSetupId], references: [id])
+  symbol                   String
+  company                  String
+  sector                   String
+  quantity                 Int
+  averagePrice             Float
+  currentPrice             Float
+  dividendsReceived        Float
+  expectedAnnualDividend   Float
+  thesis                   String
+  tag                      String
+  riskLevel                String
+  createdAt                DateTime      @default(now())
+  transactions             Transaction[]
+  documents                Document[]
+}
+
+model Transaction {
+  id             String      @id @default(cuid())
+  holdingId      String?
+  holding        Holding?    @relation(fields: [holdingId], references: [id])
+  brokerSetupId  String
+  brokerSetup    BrokerSetup @relation(fields: [brokerSetupId], references: [id])
+  date           DateTime
+  settlementDate DateTime?
+  symbol         String
+  type           String
+  quantity       Int
+  price          Float
+  charges        Float
+  netAmount      Float
+  reference      String?
+  notes          String?
+}
+
+model Document {
+  id            String       @id @default(cuid())
+  title         String
+  documentType  String
+  brokerSetupId String
+  brokerSetup   BrokerSetup  @relation(fields: [brokerSetupId], references: [id])
+  holdingId     String?
+  holding       Holding?     @relation(fields: [holdingId], references: [id])
+  relatedStock  String?
+  documentDate  DateTime
+  filePath      String
+  notes         String?
+}
+
+model Alert {
+  id        String   @id @default(cuid())
+  stockId   String?
+  stock     Stock?   @relation(fields: [stockId], references: [id])
+  title     String
+  severity  String
+  detail    String
+  status    String   @default("open")
+  createdAt DateTime @default(now())
+}
+
+model AiAnalysis {
+  id        String   @id @default(cuid())
+  scope     String
+  prompt    String
+  answer    String
+  model     String
+  createdAt DateTime @default(now())
+}

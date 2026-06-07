@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NGX Dividend Radar Preview</title>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: radial-gradient(circle at 20% 0%, rgba(34,197,94,.13), transparent 28%), radial-gradient(circle at 88% 8%, rgba(59,130,246,.12), transparent 30%), #08111f;
+        color: #e5e7eb;
+        font-family: Arial, Helvetica, sans-serif;
+      }
+      .app { display: grid; grid-template-columns: 250px 1fr; min-height: 100vh; }
+      aside { border-right: 1px solid rgba(148,163,184,.18); background: rgba(7,16,29,.96); padding: 22px 12px; position: sticky; top: 0; height: 100vh; }
+      .brand { display: flex; align-items: center; gap: 12px; margin: 0 8px 28px; }
+      .logo { width: 50px; height: 50px; border: 1px solid rgba(34,197,94,.55); border-radius: 50%; display: grid; place-items: center; color: #22c55e; font-weight: 900; box-shadow: 0 0 22px rgba(34,197,94,.18); }
+      .brand b { display: block; font-size: 25px; line-height: 24px; }
+      .brand span { color: #22c55e; font-weight: 800; }
+      nav a { display: flex; align-items: center; gap: 14px; height: 48px; border-radius: 8px; padding: 0 15px; color: #cbd5e1; text-decoration: none; margin: 4px 0; font-size: 15px; }
+      nav a:first-child { background: rgba(34,197,94,.15); border: 1px solid rgba(34,197,94,.35); box-shadow: inset 3px 0 0 #22c55e; color: white; }
+      main { min-width: 0; }
+      header { position: sticky; top: 0; z-index: 10; display: flex; gap: 18px; align-items: center; padding: 18px 22px; background: rgba(8,17,31,.88); backdrop-filter: blur(18px); border-bottom: 1px solid rgba(148,163,184,.14); }
+      .search { flex: 1; height: 44px; border: 1px solid rgba(148,163,184,.32); border-radius: 8px; background: rgba(2,6,23,.36); color: #94a3b8; display: flex; align-items: center; padding: 0 16px; }
+      .button { height: 44px; border-radius: 8px; display: inline-flex; align-items: center; gap: 8px; padding: 0 16px; font-size: 14px; font-weight: 800; border: 1px solid rgba(34,197,94,.65); background: rgba(34,197,94,.1); color: #22c55e; }
+      .ask { background: #4f46e5; color: white; border-color: #4f46e5; box-shadow: 0 0 24px rgba(99,102,241,.35); }
+      .status { border: 1px solid rgba(148,163,184,.2); border-radius: 8px; padding: 7px 12px; background: rgba(2,6,23,.35); font-size: 12px; }
+      .status b { color: #22c55e; }
+      .content { padding: 18px 22px; display: grid; gap: 14px; max-width: 1600px; margin: auto; }
+      .grid { display: grid; gap: 14px; }
+      .top { grid-template-columns: 2fr 1.55fr 1.75fr 1.85fr; }
+      .middle { grid-template-columns: 2.1fr 1.75fr 1.7fr; }
+      .bottom { grid-template-columns: 1.65fr 1.35fr 1.45fr 1.55fr; }
+      .card {
+        border: 1px solid rgba(148,163,184,.18);
+        background: linear-gradient(180deg, rgba(22,34,53,.94), rgba(10,18,32,.92));
+        border-radius: 8px;
+        padding: 16px;
+        box-shadow: 0 18px 44px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.04);
+      }
+      h2 { margin: 0 0 15px; font-size: 13px; text-transform: uppercase; }
+      .huge { font-size: 34px; font-weight: 900; color: white; }
+      .muted { color: #94a3b8; font-size: 13px; }
+      .metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 18px 0; border-bottom: 1px solid rgba(148,163,184,.16); padding-bottom: 14px; }
+      .metric b { display: block; font-size: 18px; }
+      .green { color: #22c55e; } .red { color: #ef4444; } .amber { color: #f59e0b; } .blue { color: #3b82f6; }
+      .spark { height: 56px; background: linear-gradient(180deg, rgba(34,197,94,.22), transparent); clip-path: polygon(0 80%, 8% 45%, 16% 30%, 26% 70%, 37% 48%, 48% 36%, 58% 62%, 68% 34%, 77% 22%, 85% 45%, 91% 18%, 100% 34%, 100% 100%, 0 100%); border-bottom: 2px solid rgba(34,197,94,.8); }
+      .badge { display: inline-flex; border-radius: 6px; padding: 5px 8px; background: rgba(34,197,94,.15); color: #86efac; font-size: 12px; font-weight: 800; }
+      .opportunity { display: flex; gap: 14px; }
+      .tile-logo { width: 60px; height: 60px; border-radius: 8px; background: linear-gradient(135deg, #f97316, #dc2626); display: grid; place-items: center; color: white; font-weight: 900; }
+      .score { color: #22c55e; font-size: 32px; font-weight: 900; }
+      .alert-row, .change-row, .watch-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid rgba(148,163,184,.14); background: rgba(8,17,31,.55); border-radius: 8px; padding: 12px; margin: 8px 0; }
+      .heatmap { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+      .sector { border: 1px solid rgba(148,163,184,.16); background: rgba(15,23,42,.52); border-radius: 8px; padding: 14px; }
+      .sector:nth-child(1), .sector:nth-child(2) { background: rgba(34,197,94,.14); }
+      .sector:nth-child(3), .sector:nth-child(5) { background: rgba(239,68,68,.13); }
+      table { width: 100%; border-collapse: collapse; font-size: 13px; }
+      th { text-align: left; color: #64748b; font-size: 11px; padding: 8px; }
+      td { border-top: 1px solid rgba(148,163,184,.12); padding: 10px 8px; }
+      .bars { display: flex; height: 185px; gap: 16px; align-items: end; border-bottom: 1px solid rgba(148,163,184,.22); padding: 0 8px 18px; }
+      .bar { flex: 1; border-radius: 6px 6px 0 0; text-align: center; color: white; font-size: 12px; display: flex; align-items: start; justify-content: center; padding-top: 6px; font-weight: 900; }
+      .donut { width: 140px; height: 140px; border-radius: 50%; background: conic-gradient(#3b82f6 0 48%, #10b981 48% 74%, #eab308 74% 91%, #64748b 91%); display: grid; place-items: center; }
+      .donut div { width: 78px; height: 78px; border-radius: 50%; background: #0b1424; display: grid; place-items: center; text-align: center; font-weight: 900; }
+      .allocation { display: flex; gap: 20px; align-items: center; }
+      .ai p { line-height: 1.55; color: #cbd5e1; font-size: 14px; }
+      @media (max-width: 1100px) {
+        body { min-width: 0; overflow: hidden; }
+        .app {
+          width: 1680px;
+          zoom: calc(100vw / 1680);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <aside>
+        <div class="brand"><div class="logo">◎</div><div><b>NGX</b><span>Dividend Radar</span></div></div>
+        <nav>
+          <a href="#">⌂ Dashboard</a><a>⌕ Market Scanner</a><a>▦ Sector Map</a><a>▽ Stock Screener</a><a>◎ Dividend Radar</a><a>☆ Watchlist</a><a>▣ Portfolio</a><a>◔ Alerts</a><a>✦ AI Assistant</a><a>▤ Reports</a><a>⇧ Import Data</a><a>⚙ Settings</a>
+        </nav>
+      </aside>
+      <main>
+        <header>
+          <div class="search">⌕ Search stocks (e.g. GTCO, MTNN, UBA...) <span style="margin-left:auto;border:1px solid #475569;padding:3px 7px;border-radius:5px">⌘ K</span></div>
+          <button class="button">⟳ Refresh Market Data</button>
+          <div class="muted">Last updated: June 7, 2026 21:45 WAT</div>
+          <div class="status"><b>● Fresh</b><br/>Local data connected</div>
+          <button class="button ask">✦ Ask AI</button>
+        </header>
+        <section class="content">
+          <div class="grid top">
+            <div class="card"><h2>⌁ Market Pulse</h2><div class="huge">216</div><div class="muted">Total stocks scanned</div><div class="metrics"><div class="metric"><b class="green">75</b><span class="muted">Advancing</span></div><div class="metric"><b class="red">36</b><span class="muted">Declining</span></div><div class="metric"><b class="amber">20</b><span class="muted">Unchanged</span></div></div><div class="spark"></div></div>
+            <div class="card"><h2>▣ Data Freshness</h2><p class="muted">Last sync</p><h3>June 7, 2026 21:45 WAT</h3><p class="muted">Source</p><p><b>Manual seed + delayed NGX-style snapshot</b> <span class="badge">Live-ready</span></p><p class="muted">◷ Next local check in 15 mins</p></div>
+            <div class="card"><h2>🏆 Top Opportunity</h2><div class="opportunity"><div class="tile-logo">GTCO</div><div><h3>GTCO</h3><p class="muted">Guaranty Trust Holding Co.</p><span class="score">91</span> <span class="muted">/100</span><br/><span class="badge">Strong Dividend Candidate</span></div></div><p class="muted">High ROE, deep liquidity, reasonable valuation, and a strong dividend record.</p></div>
+            <div class="card"><h2 class="red">🛡 Risk Alerts</h2><div class="alert-row"><b>🔥 Low Liquidity Warning</b><span class="badge">6</span></div><div class="alert-row"><b>⚠ Dividend Trap Watch</b><span class="badge">8</span></div><div class="alert-row"><b>◔ Concentration Risk</b><span class="badge">3</span></div><p class="red"><b>Review alerts →</b></p></div>
+          </div>
+          <div class="grid middle">
+            <div class="card"><h2>Sector Heatmap</h2><div class="heatmap"><div class="sector"><b>Banking</b><h3 class="green">+1.85%</h3><p>Score: 78</p></div><div class="sector"><b>Telecom/ICT</b><h3 class="green">+0.92%</h3><p>Score: 74</p></div><div class="sector"><b>Consumer Goods</b><h3 class="red">-0.48%</h3><p>Score: 62</p></div><div class="sector"><b>Industrial Goods</b><h3 class="green">+0.15%</h3><p>Score: 58</p></div><div class="sector"><b>Oil & Gas</b><h3 class="red">-1.32%</h3><p>Score: 45</p></div><div class="sector"><b>Healthcare</b><h3 class="green">+0.67%</h3><p>Score: 61</p></div></div></div>
+            <div class="card"><h2>Dividend Leaders</h2><table><tr><th>#</th><th>Stock</th><th>Yield</th><th>Score</th><th>Action</th></tr><tr><td>1</td><td><b>GTCO</b></td><td>10.45%</td><td class="green">88</td><td>☆ Watchlist</td></tr><tr><td>2</td><td><b>Zenith Bank</b></td><td>9.82%</td><td class="green">86</td><td>☆ Watchlist</td></tr><tr><td>3</td><td><b>UBA</b></td><td>8.90%</td><td class="green">84</td><td>☆ Watchlist</td></tr><tr><td>4</td><td><b>MTNN</b></td><td>8.35%</td><td class="green">82</td><td>☆ Watchlist</td></tr><tr><td>5</td><td><b>BUA Foods</b></td><td>7.60%</td><td class="green">80</td><td>☆ Watchlist</td></tr></table></div>
+            <div class="card"><h2>Opportunity Score Distribution</h2><div class="bars"><div class="bar" style="height:20px;background:#ef4444">6</div><div class="bar" style="height:45px;background:#f97316">18</div><div class="bar" style="height:84px;background:#eab308">42</div><div class="bar" style="height:132px;background:#22c55e">88</div><div class="bar" style="height:96px;background:#10b981">62</div></div><p><span class="red">Low Opportunity</span><span class="green" style="float:right">High Opportunity</span></p></div>
+          </div>
+          <div class="grid bottom">
+            <div class="card"><h2>What Changed Since Last Scan</h2><div class="change-row"><b>GTCO</b><span class="green">+0.65%</span></div><div class="change-row"><b>MTNN</b><span class="green">+2.34%</span></div><div class="change-row"><b>OANDO</b><span class="red">-3.21%</span></div><div class="change-row"><b>NESTLE</b><span class="amber">0.00%</span></div></div>
+            <div class="card"><h2>Watchlist Movement</h2><div class="watch-row"><b>GTCO</b><span>₦72.50</span><span class="green">+1.12%</span></div><div class="watch-row"><b>ZENITHBANK</b><span>₦49.80</span><span class="green">+0.91%</span></div><div class="watch-row"><b>MTNN</b><span>₦245.00</span><span class="green">+2.34%</span></div><div class="watch-row"><b>UBA</b><span>₦34.10</span><span class="red">-0.58%</span></div></div>
+            <div class="card"><h2>Portfolio Allocation</h2><div class="allocation"><div class="donut"><div>₦4.0M<br/><small>Total value</small></div></div><div><p>● Banking 48.2%</p><p>● Telecom/ICT 25.8%</p><p>● Consumer Goods 17.3%</p><p>● Other 8.7%</p></div></div><p class="blue"><b>View Portfolio →</b></p></div>
+            <div class="card ai"><h2>✦ AI Briefing</h2><p>Banking and Telecom/ICT lead this scan, supported by liquidity, dividend visibility, and earnings strength. Consumer goods are mixed: BUA Foods remains interesting but valuation needs patience. Watch liquidity and dividend-trap risk before adding smaller names. This is research intelligence only; trades remain manual through Stanbic IBTC.</p><button class="button ask">Ask follow-up</button></div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
