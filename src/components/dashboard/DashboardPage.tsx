@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import {
   AlertTriangle,
   ArrowRight,
-  Banknote,
   Bell,
   Clock,
   Database,
@@ -12,7 +11,6 @@ import {
   Info,
   LineChart,
   Plus,
-  RefreshCcw,
   ShieldAlert,
   Sparkles,
   Star,
@@ -46,7 +44,7 @@ export function DashboardPage() {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-        <Card className="xl:col-span-4">
+        <Card className="xl:col-span-3">
           <SectionTitle>
             <span className="inline-flex items-center gap-2">
               <LineChart size={17} className="text-emerald-400" /> Market Pulse
@@ -57,7 +55,6 @@ export function DashboardPage() {
               <div className="text-4xl font-black text-white">{marketPulse.total}</div>
               <div className="mt-1 text-sm text-slate-300">Total stocks scanned</div>
             </div>
-            <Badge tone="positive">Fresh scan</Badge>
           </div>
           <div className="mt-5 grid grid-cols-3 gap-4 border-b border-slate-700/60 pb-4">
             <Metric label="Advancing" value={`${marketPulse.advancing * 15}`} tone="positive" />
@@ -80,7 +77,7 @@ export function DashboardPage() {
             </div>
             <div>
               <div className="text-xs text-slate-400">Source</div>
-              <div className="mt-2 flex items-center gap-2">
+              <div className="mt-2 flex flex-wrap items-center gap-2">
                 <span className="text-base font-semibold text-white">{dataSource}</span>
                 <Badge tone="positive">Live-ready</Badge>
               </div>
@@ -122,7 +119,7 @@ export function DashboardPage() {
           <p className="mt-3 text-sm leading-5 text-slate-300">{topStock.reason}</p>
         </Card>
 
-        <Card className="xl:col-span-2">
+        <Card className="xl:col-span-3">
           <SectionTitle>
             <span className="inline-flex items-center gap-2 text-red-300">
               <ShieldAlert size={17} /> Risk Alerts

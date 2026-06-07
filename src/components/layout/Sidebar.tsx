@@ -9,7 +9,6 @@ import {
   Grid2X2,
   Home,
   Import,
-  LineChart,
   Radar,
   Search,
   Settings,

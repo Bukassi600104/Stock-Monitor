@@ -55,16 +55,17 @@ export function BarDistribution({ data }: { data: { range: string; count: number
 }
 
 export function DonutChart({ slices }: { slices: { label: string; value: number; color: string }[] }) {
-  let start = 0;
   const total = slices.reduce((sum, item) => sum + item.value, 0);
-  const gradient = slices
-    .map((slice) => {
-      const end = start + (slice.value / total) * 100;
-      const segment = `${slice.color} ${start}% ${end}%`;
-      start = end;
-      return segment;
-    })
-    .join(", ");
+  const gradient = slices.reduce(
+    (state, slice) => {
+      const end = state.start + (slice.value / total) * 100;
+      return {
+        start: end,
+        segments: [...state.segments, `${slice.color} ${state.start}% ${end}%`],
+      };
+    },
+    { start: 0, segments: [] as string[] },
+  ).segments.join(", ");
 
   return (
     <div className="flex items-center gap-5">
