@@ -7,6 +7,7 @@ import { alerts, brokerSetup, documents, holdings, portfolio, sectors, stocks, t
 import type { AssistantAnswer } from "@/lib/assistant";
 import { getHoldingDetail } from "@/lib/holdingDetail";
 import { buildHoldingDraft, validateHoldingDraft, type HoldingDraftInput, type HoldingDraftTag } from "@/lib/holdingDraft";
+import { buildDocumentDraft, summarizeDocumentReconciliation, validateDocumentDraft, type DocumentDraftInput, type DocumentDraftType } from "@/lib/documentDraft";
 import { importTemplates, type ImportKind, type ImportValidationResult } from "@/lib/imports";
 import { generateReport, reportDefinitions, type GeneratedReport, type ReportType } from "@/lib/reports";
 import { formatCompactNaira, formatNaira } from "@/lib/scoring";
@@ -252,7 +253,19 @@ export function PortfolioPage({ tab = "Overview" }: { tab?: string }) {
 
   return (
     <>
-      <PageHeader title="Portfolio / Wallet" description="A private ledger for holdings Tony bought manually through Stanbic IBTC Stockbrokers. The app tracks and explains; it never places trades." action={tab === "Transactions" ? <Link href="/portfolio/transactions/new" className="inline-flex h-10 items-center gap-2 rounded-[8px] bg-emerald-600 px-4 text-sm font-bold text-white"><Plus size={16} /> Add transaction</Link> : <Link href="/portfolio/holdings/new" className="inline-flex h-10 items-center gap-2 rounded-[8px] bg-emerald-600 px-4 text-sm font-bold text-white"><Plus size={16} /> Add holding</Link>} />
+      <PageHeader
+        title="Portfolio / Wallet"
+        description="A private ledger for holdings Tony bought manually through Stanbic IBTC Stockbrokers. The app tracks and explains; it never places trades."
+        action={
+          tab === "Transactions" ? (
+            <Link href="/portfolio/transactions/new" className="inline-flex h-10 items-center gap-2 rounded-[8px] bg-emerald-600 px-4 text-sm font-bold text-white"><Plus size={16} /> Add transaction</Link>
+          ) : tab === "Documents" ? (
+            <Link href="/portfolio/documents/new" className="inline-flex h-10 items-center gap-2 rounded-[8px] bg-emerald-600 px-4 text-sm font-bold text-white"><Upload size={16} /> Add document</Link>
+          ) : (
+            <Link href="/portfolio/holdings/new" className="inline-flex h-10 items-center gap-2 rounded-[8px] bg-emerald-600 px-4 text-sm font-bold text-white"><Plus size={16} /> Add holding</Link>
+          )
+        }
+      />
       <div className="mb-4 flex gap-2 overflow-x-auto thin-scrollbar">
         {nav.map(([label, href]) => <a key={label} href={href} className={`shrink-0 rounded-[8px] border px-3 py-2 text-sm font-bold ${label === tab ? "border-emerald-400 bg-emerald-500/15 text-white" : "border-slate-700 text-slate-400"}`}>{label}</a>)}
       </div>
@@ -262,7 +275,7 @@ export function PortfolioPage({ tab = "Overview" }: { tab?: string }) {
       {tab === "Dividends" && <DividendsPanel />}
       {tab === "Performance" && <PerformancePanel />}
       {tab === "Risk & Allocation" && <RiskPanel />}
-      {tab === "Documents" && <DocumentsPanel />}
+      {tab === "Documents" && <DocumentsEvidencePanel />}
       {tab === "Broker Setup" && <BrokerSetupPanel />}
     </>
   );
@@ -733,8 +746,165 @@ function RiskPanel() {
   return <Card><SectionTitle>Risk & Allocation</SectionTitle><div className="grid grid-auto-fit gap-4">{["Banking is 48.2% of current value; watch the 50% review threshold.", "No single stock is above the 25% hard review threshold.", "Low-liquidity exposure is controlled, but Oil & Gas watchlist names need caution.", "Dividend income depends heavily on tier-one banks."].map((risk) => <div key={risk} className="soft-panel rounded-[8px] p-4 text-sm text-slate-300"><AlertTriangle className="mb-3 text-amber-300" size={20} />{risk}</div>)}</div></Card>;
 }
 
-function DocumentsPanel() {
-  return <Card><SectionTitle>Documents</SectionTitle><div className="grid gap-3">{documents.map((doc) => <div key={doc.title} className="soft-panel flex items-center justify-between gap-3 rounded-[8px] p-4"><div className="flex items-center gap-3"><FileText className="text-blue-300" /><div><div className="font-bold text-white">{doc.title}</div><div className="text-xs text-slate-400">{doc.type} · {doc.path}</div></div></div><Badge>{doc.date}</Badge></div>)}</div></Card>;
+function DocumentsEvidencePanel() {
+  const reconciliation = summarizeDocumentReconciliation();
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-auto-fit gap-4">
+        <Card>
+          <SectionTitle>Reconciliation</SectionTitle>
+          <div className="grid grid-auto-fit gap-4">
+            <Metric label="Default broker" value={reconciliation.defaultBroker} />
+            <Metric label="Holdings entered" value={`${reconciliation.totalHoldings}`} />
+            <Metric label="Contract notes linked" value={`${reconciliation.holdingsWithContractNotes}`} tone={reconciliation.holdingsNeedingContractNotes.length ? "warning" : "positive"} />
+            <Metric label="Storage root" value={reconciliation.localStorageRoot} />
+          </div>
+          <div className="mt-4 soft-panel rounded-[8px] p-4 text-sm leading-6 text-slate-300">
+            Last contract note: <span className="font-semibold text-slate-100">{reconciliation.lastContractNoteDate}</span>. Last portfolio statement: <span className="font-semibold text-slate-100">{reconciliation.lastPortfolioStatementDate}</span>.
+          </div>
+        </Card>
+
+        <Card>
+          <SectionTitle>Needs Evidence</SectionTitle>
+          <div className="flex flex-wrap gap-2">
+            {reconciliation.holdingsNeedingContractNotes.map((symbol) => (
+              <Badge key={symbol} tone="warning">{symbol}</Badge>
+            ))}
+          </div>
+          <p className="mt-4 text-sm leading-6 text-slate-300">
+            Upload or reference Stanbic contract notes for these holdings so the ledger can tie each position back to broker evidence.
+          </p>
+        </Card>
+      </div>
+
+      <Card>
+        <SectionTitle action={<Link href="/portfolio/documents/new" className="inline-flex h-9 items-center gap-2 rounded-[8px] border border-slate-700 px-3 text-xs font-bold text-slate-100"><Upload size={14} /> Add evidence</Link>}>Documents</SectionTitle>
+        <div className="grid gap-3">
+          {documents.map((doc) => (
+            <div key={doc.title} className="soft-panel grid gap-3 rounded-[8px] p-4 text-sm md:grid-cols-[1fr_160px_150px] md:items-center">
+              <div className="flex min-w-0 items-start gap-3">
+                <FileText className="mt-1 shrink-0 text-blue-300" size={20} />
+                <div className="min-w-0">
+                  <div className="font-bold text-white">{doc.title}</div>
+                  <div className="mt-1 text-xs text-slate-400">{doc.type} - {doc.path}</div>
+                </div>
+              </div>
+              <div className="text-slate-300">{doc.relatedStock ?? "Portfolio-wide"}</div>
+              <Badge>{doc.date}</Badge>
+            </div>
+          ))}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+const documentTypes: DocumentDraftType[] = [
+  "Stanbic IBTC contract note",
+  "Stanbic IBTC portfolio statement",
+  "General contract note",
+  "Broker statement",
+  "CSCS statement",
+  "Dividend payment proof",
+  "Company annual report",
+  "Research report",
+  "Tax/withholding document",
+];
+
+export function AddDocumentPage() {
+  const [form, setForm] = useState<DocumentDraftInput>({
+    title: "GTCO contract note",
+    type: "Stanbic IBTC contract note",
+    documentDate: "2026-06-08",
+    relatedStock: "GTCO",
+    relatedTransactionReference: "SIBTC-CN-001",
+    originalFileName: "GTCO Contract Note.pdf",
+    notes: "Stanbic IBTC broker evidence for local portfolio reconciliation.",
+  });
+  const draft = buildDocumentDraft(form);
+  const issues = validateDocumentDraft(draft);
+  const errors = issues.filter((issue) => issue.severity === "error");
+  const warnings = issues.filter((issue) => issue.severity === "warning");
+
+  function updateField<K extends keyof DocumentDraftInput>(field: K, value: DocumentDraftInput[K]) {
+    setForm((current) => ({ ...current, [field]: value }));
+  }
+
+  return (
+    <>
+      <PageHeader
+        title="Add Document Evidence"
+        description="Record local metadata for Stanbic IBTC contract notes, statements, CSCS files, dividend proofs, and research documents. Files stay local; the app stores paths and reconciliation context."
+        action={<Link href="/portfolio/documents" className="inline-flex h-10 items-center rounded-[8px] border border-slate-700 px-4 text-sm font-bold text-slate-100">Back to documents</Link>}
+      />
+
+      <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+        <Card>
+          <SectionTitle action={<Badge tone="primary">Stanbic-first</Badge>}>Document Metadata</SectionTitle>
+          <div className="grid gap-4 md:grid-cols-2">
+            <FormField label="Document title">
+              <input className={fieldClass} value={form.title} onChange={(event) => updateField("title", event.target.value)} />
+            </FormField>
+            <FormField label="Document type">
+              <select className={fieldClass} value={form.type} onChange={(event) => updateField("type", event.target.value as DocumentDraftType)}>
+                {documentTypes.map((type) => <option key={type}>{type}</option>)}
+              </select>
+            </FormField>
+            <FormField label="Document date">
+              <input type="date" className={fieldClass} value={form.documentDate} onChange={(event) => updateField("documentDate", event.target.value)} />
+            </FormField>
+            <FormField label="Broker">
+              <input className={fieldClass} value={draft.broker} onChange={(event) => updateField("broker", event.target.value)} />
+            </FormField>
+            <FormField label="Related stock">
+              <input className={fieldClass} value={form.relatedStock ?? ""} onChange={(event) => updateField("relatedStock", event.target.value)} placeholder="GTCO" />
+            </FormField>
+            <FormField label="Transaction reference">
+              <input className={fieldClass} value={form.relatedTransactionReference ?? ""} onChange={(event) => updateField("relatedTransactionReference", event.target.value)} placeholder="SIBTC-CN-001" />
+            </FormField>
+            <FormField label="Original file name">
+              <input className={fieldClass} value={form.originalFileName} onChange={(event) => updateField("originalFileName", event.target.value)} placeholder="Contract Note.pdf" />
+            </FormField>
+            <FormField label="Local storage path">
+              <input className={`${fieldClass} font-mono text-xs`} value={draft.storagePath} readOnly />
+            </FormField>
+          </div>
+
+          <label className="mt-4 grid gap-2 text-sm text-slate-300">
+            <span className="text-xs font-bold uppercase text-slate-500">Notes</span>
+            <textarea
+              className="min-h-28 w-full rounded-[8px] border border-slate-700 bg-slate-950 px-3 py-3 text-sm text-slate-100 outline-none transition focus:border-emerald-400"
+              value={form.notes ?? ""}
+              onChange={(event) => updateField("notes", event.target.value)}
+            />
+          </label>
+        </Card>
+
+        <div className="space-y-4">
+          <Card>
+            <SectionTitle>Reconciliation Preview</SectionTitle>
+            <div className="grid grid-auto-fit gap-4">
+              <Metric label="Broker" value={draft.broker} />
+              <Metric label="Related stock" value={draft.relatedStock ?? "Portfolio-wide"} />
+              <Metric label="Status" value={draft.reconciliationStatus} tone={draft.reconciliationStatus === "matched" ? "positive" : draft.reconciliationStatus === "needs transaction link" ? "warning" : "neutral"} />
+              <Metric label="Stored as" value={draft.storagePath} />
+            </div>
+          </Card>
+
+          <Card>
+            <SectionTitle>Validation</SectionTitle>
+            {issues.length === 0 && <div className="soft-panel rounded-[8px] p-4 text-sm text-emerald-200">Ready to save metadata locally when persistence is enabled. The source document remains on this Windows PC.</div>}
+            {errors.length > 0 && <IssueList title="Errors" issues={errors.map((issue) => issue.message)} tone="danger" />}
+            {warnings.length > 0 && <IssueList title="Warnings" issues={warnings.map((issue) => issue.message)} tone="warning" />}
+            <div className="mt-4 soft-panel rounded-[8px] p-4 text-sm leading-6 text-slate-300">
+              Uploads should be copied under <span className="font-mono text-slate-100">data/documents/</span>. The app stores only metadata, paths, broker, linked stock, and transaction reference.
+            </div>
+          </Card>
+        </div>
+      </div>
+    </>
+  );
 }
 
 function BrokerSetupPanel() {
