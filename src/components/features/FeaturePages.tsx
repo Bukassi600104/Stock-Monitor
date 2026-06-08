@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { AlertTriangle, ArrowRight, Bot, CheckCircle2, Download, FileText, Filter, Plus, Upload } from "lucide-react";
 import { alerts, brokerSetup, documents, holdings, portfolio, sectors, stocks, transactions, watchlist } from "@/lib/data";
 import type { AssistantAnswer } from "@/lib/assistant";
+import { buildHoldingDraft, validateHoldingDraft, type HoldingDraftInput, type HoldingDraftTag } from "@/lib/holdingDraft";
 import { importTemplates, type ImportKind, type ImportValidationResult } from "@/lib/imports";
 import { generateReport, reportDefinitions, type GeneratedReport, type ReportType } from "@/lib/reports";
 import { formatCompactNaira, formatNaira } from "@/lib/scoring";
@@ -248,7 +249,7 @@ export function PortfolioPage({ tab = "Overview" }: { tab?: string }) {
 
   return (
     <>
-      <PageHeader title="Portfolio / Wallet" description="A private ledger for holdings Tony bought manually through Stanbic IBTC Stockbrokers. The app tracks and explains; it never places trades." action={<button className="inline-flex h-10 items-center gap-2 rounded-[8px] bg-emerald-600 px-4 text-sm font-bold text-white"><Plus size={16} /> Add holding</button>} />
+      <PageHeader title="Portfolio / Wallet" description="A private ledger for holdings Tony bought manually through Stanbic IBTC Stockbrokers. The app tracks and explains; it never places trades." action={<a href="/portfolio/holdings/new" className="inline-flex h-10 items-center gap-2 rounded-[8px] bg-emerald-600 px-4 text-sm font-bold text-white"><Plus size={16} /> Add holding</a>} />
       <div className="mb-4 flex gap-2 overflow-x-auto thin-scrollbar">
         {nav.map(([label, href]) => <a key={label} href={href} className={`shrink-0 rounded-[8px] border px-3 py-2 text-sm font-bold ${label === tab ? "border-emerald-400 bg-emerald-500/15 text-white" : "border-slate-700 text-slate-400"}`}>{label}</a>)}
       </div>
@@ -305,6 +306,172 @@ function HoldingsTable() {
         </table>
       </div>
     </Card>
+  );
+}
+
+const holdingTags: HoldingDraftTag[] = ["Core Holding", "Dividend Income", "Value Play", "Defensive", "Speculative", "Learning Position"];
+
+export function AddHoldingPage() {
+  const [form, setForm] = useState<HoldingDraftInput>({
+    symbol: "GTCO",
+    buyDate: "2026-06-08",
+    settlementDate: "",
+    quantity: 1000,
+    buyPrice: 72.5,
+    charges: 1500,
+    vatFees: 0,
+    personalReason: "Long-term dividend research candidate.",
+    thesis: "Manual Stanbic IBTC purchase after reviewing scanner evidence.",
+    targetHoldingPeriod: "3-5 years",
+    dividendExpectation: "Income plus moderate capital appreciation.",
+    riskConcern: "Banking concentration and market data freshness.",
+    tag: "Dividend Income",
+    contractNoteReference: "",
+  });
+  const draft = buildHoldingDraft(form);
+  const issues = validateHoldingDraft(draft);
+  const errors = issues.filter((issue) => issue.severity === "error");
+  const warnings = issues.filter((issue) => issue.severity === "warning");
+
+  function updateField<K extends keyof HoldingDraftInput>(field: K, value: HoldingDraftInput[K]) {
+    setForm((current) => ({ ...current, [field]: value }));
+  }
+
+  return (
+    <>
+      <PageHeader
+        title="Add Holding"
+        description="Record a completed manual purchase from Stanbic IBTC. This creates a local draft for review; it does not place a trade or contact the broker."
+        action={<a href="/portfolio/holdings" className="inline-flex h-10 items-center rounded-[8px] border border-slate-700 px-4 text-sm font-bold text-slate-100">Back to holdings</a>}
+      />
+
+      <div className="grid gap-4 xl:grid-cols-[1fr_380px]">
+        <Card>
+          <SectionTitle
+            action={
+              <Badge tone={draft.dataStatus === "linked" ? "positive" : "warning"}>
+                <span className="hidden sm:inline">{draft.dataStatus === "linked" ? "Linked to scanner" : "Incomplete data"}</span>
+                <span className="sm:hidden">{draft.dataStatus === "linked" ? "Linked" : "Incomplete"}</span>
+              </Badge>
+            }
+          >
+            Manual Entry
+          </SectionTitle>
+          <div className="grid gap-4 md:grid-cols-2">
+            <FormField label="Stock symbol">
+              <input className={fieldClass} value={form.symbol} onChange={(event) => updateField("symbol", event.target.value)} />
+            </FormField>
+            <FormField label="Company">
+              <input className={fieldClass} value={draft.company} onChange={(event) => updateField("company", event.target.value)} />
+            </FormField>
+            <FormField label="Broker used">
+              <input className={fieldClass} value={draft.broker} onChange={(event) => updateField("broker", event.target.value)} />
+            </FormField>
+            <FormField label="Broker account nickname">
+              <input className={fieldClass} value={draft.brokerAccountNickname} onChange={(event) => updateField("brokerAccountNickname", event.target.value)} />
+            </FormField>
+            <FormField label="Buy date">
+              <input type="date" className={fieldClass} value={form.buyDate ?? ""} onChange={(event) => updateField("buyDate", event.target.value)} />
+            </FormField>
+            <FormField label="Settlement date">
+              <input type="date" className={fieldClass} value={form.settlementDate ?? ""} onChange={(event) => updateField("settlementDate", event.target.value)} />
+            </FormField>
+            <FormField label="Quantity bought">
+              <input type="number" min="0" className={fieldClass} value={form.quantity} onChange={(event) => updateField("quantity", Number(event.target.value))} />
+            </FormField>
+            <FormField label="Buy price per share">
+              <input type="number" min="0" step="0.01" className={fieldClass} value={form.buyPrice} onChange={(event) => updateField("buyPrice", Number(event.target.value))} />
+            </FormField>
+            <FormField label="Brokerage / transaction charges">
+              <input type="number" min="0" step="0.01" className={fieldClass} value={form.charges ?? 0} onChange={(event) => updateField("charges", Number(event.target.value))} />
+            </FormField>
+            <FormField label="VAT / fees">
+              <input type="number" min="0" step="0.01" className={fieldClass} value={form.vatFees ?? 0} onChange={(event) => updateField("vatFees", Number(event.target.value))} />
+            </FormField>
+            <FormField label="CSCS account number">
+              <input className={fieldClass} value={draft.cscsNumber} onChange={(event) => updateField("cscsNumber", event.target.value)} />
+            </FormField>
+            <FormField label="CHN reference">
+              <input className={fieldClass} value={draft.chn} onChange={(event) => updateField("chn", event.target.value)} />
+            </FormField>
+            <FormField label="Contract note reference">
+              <input className={fieldClass} value={form.contractNoteReference ?? ""} onChange={(event) => updateField("contractNoteReference", event.target.value)} placeholder="SIBTC-CN-..." />
+            </FormField>
+            <FormField label="Tag">
+              <select className={fieldClass} value={draft.tag} onChange={(event) => updateField("tag", event.target.value as HoldingDraftTag)}>
+                {holdingTags.map((tag) => <option key={tag}>{tag}</option>)}
+              </select>
+            </FormField>
+            <FormField label="Personal reason">
+              <textarea className={`${fieldClass} min-h-24 resize-none py-3`} value={form.personalReason ?? ""} onChange={(event) => updateField("personalReason", event.target.value)} />
+            </FormField>
+            <FormField label="Investment thesis">
+              <textarea className={`${fieldClass} min-h-24 resize-none py-3`} value={form.thesis ?? ""} onChange={(event) => updateField("thesis", event.target.value)} />
+            </FormField>
+            <FormField label="Target holding period">
+              <input className={fieldClass} value={form.targetHoldingPeriod ?? ""} onChange={(event) => updateField("targetHoldingPeriod", event.target.value)} />
+            </FormField>
+            <FormField label="Dividend expectation">
+              <input className={fieldClass} value={form.dividendExpectation ?? ""} onChange={(event) => updateField("dividendExpectation", event.target.value)} />
+            </FormField>
+            <div className="md:col-span-2">
+              <FormField label="Risk concern at entry">
+                <textarea className={`${fieldClass} min-h-24 resize-none py-3`} value={form.riskConcern ?? ""} onChange={(event) => updateField("riskConcern", event.target.value)} />
+              </FormField>
+            </div>
+          </div>
+        </Card>
+
+        <div className="space-y-4">
+          <Card>
+            <SectionTitle>Cost Preview</SectionTitle>
+            <div className="grid gap-4">
+              <Metric label="Gross purchase value" value={formatCompactNaira(draft.grossPurchaseValue)} />
+              <Metric label="Total cost after charges" value={formatCompactNaira(draft.totalCost)} tone="positive" />
+              <Metric label="Average cost per share" value={formatNaira(draft.averageCostPerShare)} />
+              <Metric label="Latest scanner price" value={draft.currentPrice ? formatNaira(draft.currentPrice) : "Missing"} tone={draft.currentPrice ? "neutral" : "warning"} />
+            </div>
+          </Card>
+
+          <Card>
+            <SectionTitle>Validation</SectionTitle>
+            {issues.length === 0 && <div className="soft-panel rounded-[8px] p-4 text-sm text-emerald-200">Ready to save locally when persistence is enabled. Trade execution remains manual through Stanbic IBTC.</div>}
+            {errors.length > 0 && <IssueList title="Errors" issues={errors.map((issue) => issue.message)} tone="danger" />}
+            {warnings.length > 0 && <IssueList title="Warnings" issues={warnings.map((issue) => issue.message)} tone="warning" />}
+            <div className="mt-4 soft-panel rounded-[8px] p-4 text-sm leading-6 text-slate-300">
+              Documents should be stored under <span className="font-mono text-slate-100">data/documents/</span>; this draft stores only metadata and local file paths.
+            </div>
+          </Card>
+        </div>
+      </div>
+    </>
+  );
+}
+
+const fieldClass = "h-11 w-full rounded-[8px] border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100 outline-none transition focus:border-emerald-400";
+
+function FormField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="grid gap-2 text-sm text-slate-300">
+      <span className="text-xs font-bold uppercase text-slate-500">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function IssueList({ title, issues, tone }: { title: string; issues: string[]; tone: "warning" | "danger" }) {
+  return (
+    <div className="mb-3 soft-panel rounded-[8px] p-4">
+      <Badge tone={tone}>{title}</Badge>
+      <ul className="mt-3 space-y-2 text-sm leading-6 text-slate-300">
+        {issues.map((issue) => (
+          <li key={issue} className="flex gap-2">
+            <AlertTriangle className={tone === "danger" ? "mt-0.5 shrink-0 text-red-300" : "mt-0.5 shrink-0 text-amber-300"} size={16} />
+            <span>{issue}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 

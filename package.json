@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "tsx src/lib/assistant.test.ts",
+    "test": "tsx src/lib/run-tests.ts",
     "lint": "eslint",
     "seed": "tsx prisma/seed.ts"
   },

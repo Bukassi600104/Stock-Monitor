@@ -19,7 +19,7 @@ export function SectionTitle({
   action?: ReactNode;
 }) {
   return (
-    <div className="mb-4 flex items-center justify-between gap-3">
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
       <h2 className="text-[13px] font-bold uppercase tracking-normal text-slate-100">{children}</h2>
       {action}
     </div>

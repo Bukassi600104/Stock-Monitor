@@ -48,10 +48,10 @@ export function TopBar({ onOpenCommand }: { onOpenCommand: () => void }) {
           )}
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-3">
           <button
             onClick={refresh}
-            className="inline-flex h-11 items-center gap-2 rounded-[8px] border border-emerald-500/70 bg-emerald-500/10 px-4 text-sm font-bold text-emerald-300 transition hover:bg-emerald-500/18"
+            className="inline-flex h-11 max-w-full items-center gap-2 rounded-[8px] border border-emerald-500/70 bg-emerald-500/10 px-4 text-sm font-bold text-emerald-300 transition hover:bg-emerald-500/18"
           >
             <RefreshCcw size={17} className={refreshing ? "animate-spin" : ""} />
             {refreshing ? "Refreshing..." : "Refresh Market Data"}
