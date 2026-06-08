@@ -1,9 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { AlertTriangle, ArrowRight, Bot, CheckCircle2, Download, FileText, Filter, Plus, Upload } from "lucide-react";
 import { alerts, brokerSetup, documents, holdings, portfolio, sectors, stocks, transactions, watchlist } from "@/lib/data";
 import type { AssistantAnswer } from "@/lib/assistant";
+import { getHoldingDetail } from "@/lib/holdingDetail";
 import { buildHoldingDraft, validateHoldingDraft, type HoldingDraftInput, type HoldingDraftTag } from "@/lib/holdingDraft";
 import { importTemplates, type ImportKind, type ImportValidationResult } from "@/lib/imports";
 import { generateReport, reportDefinitions, type GeneratedReport, type ReportType } from "@/lib/reports";
@@ -249,7 +251,7 @@ export function PortfolioPage({ tab = "Overview" }: { tab?: string }) {
 
   return (
     <>
-      <PageHeader title="Portfolio / Wallet" description="A private ledger for holdings Tony bought manually through Stanbic IBTC Stockbrokers. The app tracks and explains; it never places trades." action={<a href="/portfolio/holdings/new" className="inline-flex h-10 items-center gap-2 rounded-[8px] bg-emerald-600 px-4 text-sm font-bold text-white"><Plus size={16} /> Add holding</a>} />
+      <PageHeader title="Portfolio / Wallet" description="A private ledger for holdings Tony bought manually through Stanbic IBTC Stockbrokers. The app tracks and explains; it never places trades." action={<Link href="/portfolio/holdings/new" className="inline-flex h-10 items-center gap-2 rounded-[8px] bg-emerald-600 px-4 text-sm font-bold text-white"><Plus size={16} /> Add holding</Link>} />
       <div className="mb-4 flex gap-2 overflow-x-auto thin-scrollbar">
         {nav.map(([label, href]) => <a key={label} href={href} className={`shrink-0 rounded-[8px] border px-3 py-2 text-sm font-bold ${label === tab ? "border-emerald-400 bg-emerald-500/15 text-white" : "border-slate-700 text-slate-400"}`}>{label}</a>)}
       </div>
@@ -300,12 +302,141 @@ function HoldingsTable() {
             {holdings.map((holding) => {
               const value = holding.quantity * holding.currentPrice;
               const gain = value - holding.quantity * holding.averagePrice;
-              return <tr key={holding.id} className="hover:bg-slate-900/60"><td className="py-4"><div className="font-black text-white">{holding.symbol}</div><div className="text-xs text-slate-500">{holding.company}</div></td><td>{holding.broker}</td><td>{holding.quantity.toLocaleString()}</td><td>{formatNaira(holding.averagePrice)}</td><td>{formatNaira(holding.currentPrice)}</td><td>{formatCompactNaira(value)}</td><td className={gain >= 0 ? "font-bold text-emerald-400" : "font-bold text-red-400"}>{formatCompactNaira(gain)}</td><td>{formatCompactNaira(holding.dividendsReceived)}</td><td><Badge tone={holding.riskLevel === "Low" ? "positive" : "warning"}>{holding.riskLevel}</Badge></td><td><a className="text-blue-300" href={`/stocks/${holding.symbol}`}>Review</a></td></tr>;
+              return <tr key={holding.id} className="hover:bg-slate-900/60"><td className="py-4"><div className="font-black text-white">{holding.symbol}</div><div className="text-xs text-slate-500">{holding.company}</div></td><td>{holding.broker}</td><td>{holding.quantity.toLocaleString()}</td><td>{formatNaira(holding.averagePrice)}</td><td>{formatNaira(holding.currentPrice)}</td><td>{formatCompactNaira(value)}</td><td className={gain >= 0 ? "font-bold text-emerald-400" : "font-bold text-red-400"}>{formatCompactNaira(gain)}</td><td>{formatCompactNaira(holding.dividendsReceived)}</td><td><Badge tone={holding.riskLevel === "Low" ? "positive" : "warning"}>{holding.riskLevel}</Badge></td><td><a className="text-blue-300" href={`/portfolio/holdings/${holding.id}`}>Review</a></td></tr>;
             })}
           </tbody>
         </table>
       </div>
     </Card>
+  );
+}
+
+export function HoldingDetailPage({ holdingId }: { holdingId: string }) {
+  const detail = getHoldingDetail(holdingId);
+
+  if (!detail) {
+    return (
+      <>
+        <PageHeader title="Holding Not Found" description="This portfolio holding could not be matched to the local ledger." action={<Link href="/portfolio/holdings" className="inline-flex h-10 items-center rounded-[8px] border border-slate-700 px-4 text-sm font-bold text-slate-100">Back to holdings</Link>} />
+        <Card><p className="text-sm leading-6 text-slate-300">Check the holding ID, import the missing ledger record, or return to the holdings table.</p></Card>
+      </>
+    );
+  }
+
+  const { holding, stock, position } = detail;
+  const metricTone = position.unrealizedGain >= 0 ? "positive" : "danger";
+
+  return (
+    <>
+      <PageHeader
+        title={`${holding.symbol} Holding`}
+        description={`${holding.company} position held through ${holding.broker}. This page reviews the local portfolio record, market scanner evidence, documents, and AI holding review without placing trades.`}
+        action={<Link href="/portfolio/holdings" className="inline-flex h-10 items-center rounded-[8px] border border-slate-700 px-4 text-sm font-bold text-slate-100">Back to holdings</Link>}
+      />
+
+      <div className="mb-4 grid gap-4 xl:grid-cols-[1.2fr_.8fr]">
+        <Card>
+          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div>
+              <div className="text-sm font-bold text-emerald-300">{holding.sector}</div>
+              <h2 className="mt-2 text-4xl font-black text-white">{holding.symbol}</h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">{holding.thesis}</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Badge tone={holding.riskLevel === "Low" ? "positive" : "warning"}>{holding.riskLevel}</Badge>
+              <Badge tone={detail.aiReview.label === "Review" ? "warning" : "primary"}>{detail.aiReview.label}</Badge>
+            </div>
+          </div>
+          <div className="mt-5 grid grid-auto-fit gap-4">
+            <Metric label="Quantity" value={holding.quantity.toLocaleString()} />
+            <Metric label="Average buy price" value={formatNaira(holding.averagePrice)} />
+            <Metric label="Current price" value={formatNaira(holding.currentPrice)} />
+            <Metric label="Current value" value={formatCompactNaira(position.currentValue)} tone="positive" />
+            <Metric label="Total cost" value={formatCompactNaira(position.totalCost)} />
+            <Metric label="Unrealized gain/loss" value={`${formatCompactNaira(position.unrealizedGain)} (${position.unrealizedGainPercent.toFixed(2)}%)`} tone={metricTone} />
+            <Metric label="Dividend received" value={formatCompactNaira(holding.dividendsReceived)} tone="positive" />
+            <Metric label="Yield on cost" value={`${position.yieldOnCost.toFixed(2)}%`} />
+            <Metric label="Portfolio weight" value={`${position.portfolioWeightPercent.toFixed(2)}%`} tone={position.portfolioWeightPercent > 25 ? "warning" : "neutral"} />
+          </div>
+        </Card>
+
+        <Card>
+          <SectionTitle>AI Holding Review</SectionTitle>
+          <p className="soft-panel rounded-[8px] p-4 text-sm leading-6 text-slate-300">{detail.aiReview.summary}</p>
+          <div className="mt-4 grid gap-3">
+            {detail.aiReview.facts.map((fact) => <div key={fact} className="soft-panel rounded-[8px] p-3 text-sm text-slate-300">{fact}</div>)}
+          </div>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-3">
+        <Card>
+          <SectionTitle>Market Intelligence</SectionTitle>
+          {stock ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <Metric label="Opportunity" value={`${stock.opportunityScore}/100`} tone="positive" />
+                <Metric label="Dividend score" value={`${stock.dividendScore}/100`} tone="positive" />
+                <Metric label="Valuation" value={`${stock.valuationScore}/100`} />
+                <Metric label="Liquidity" value={`${stock.liquidityScore}/100`} />
+              </div>
+              <Sparkline values={stock.trend} className="h-24" stroke={stock.change >= 0 ? "#22C55E" : "#EF4444"} />
+              <p className="text-sm leading-6 text-slate-300">{stock.reason}</p>
+            </div>
+          ) : (
+            <p className="text-sm leading-6 text-slate-300">No linked market scanner record is available for this holding.</p>
+          )}
+        </Card>
+
+        <Card>
+          <SectionTitle>Risks To Watch</SectionTitle>
+          <div className="space-y-3">
+            {detail.aiReview.risks.map((risk) => (
+              <div key={risk} className="soft-panel rounded-[8px] p-3 text-sm leading-6 text-slate-300">
+                <AlertTriangle className="mb-2 text-amber-300" size={18} />
+                {risk}
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        <Card>
+          <SectionTitle>Documents</SectionTitle>
+          <div className="space-y-3">
+            {detail.documents.length === 0 && <div className="soft-panel rounded-[8px] p-3 text-sm text-slate-300">No local document metadata is linked yet.</div>}
+            {detail.documents.map((document) => (
+              <div key={document.title} className="soft-panel rounded-[8px] p-3">
+                <div className="font-bold text-white">{document.title}</div>
+                <div className="mt-1 text-xs leading-5 text-slate-400">{document.type} - {document.date}</div>
+                <div className="mt-1 font-mono text-[11px] text-slate-500">{document.path}</div>
+              </div>
+            ))}
+          </div>
+        </Card>
+
+        <Card className="xl:col-span-3">
+          <SectionTitle>Transactions</SectionTitle>
+          <div className="overflow-x-auto thin-scrollbar">
+            <table className="w-full min-w-[860px] text-left text-sm">
+              <thead className="text-[11px] uppercase text-slate-500"><tr><th className="py-3">Date</th><th>Type</th><th>Quantity</th><th>Price</th><th>Charges</th><th>Net amount</th><th>Reference</th></tr></thead>
+              <tbody className="divide-y divide-slate-800">
+                {detail.transactions.map((transaction) => (
+                  <tr key={transaction.id} className="hover:bg-slate-900/60">
+                    <td className="py-4 font-bold text-white">{transaction.date}</td>
+                    <td>{transaction.type}</td>
+                    <td>{transaction.quantity.toLocaleString()}</td>
+                    <td>{formatNaira(transaction.price)}</td>
+                    <td>{formatCompactNaira(transaction.charges)}</td>
+                    <td>{formatCompactNaira(transaction.netAmount)}</td>
+                    <td className="text-slate-400">{transaction.reference}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      </div>
+    </>
   );
 }
 
@@ -342,7 +473,7 @@ export function AddHoldingPage() {
       <PageHeader
         title="Add Holding"
         description="Record a completed manual purchase from Stanbic IBTC. This creates a local draft for review; it does not place a trade or contact the broker."
-        action={<a href="/portfolio/holdings" className="inline-flex h-10 items-center rounded-[8px] border border-slate-700 px-4 text-sm font-bold text-slate-100">Back to holdings</a>}
+        action={<Link href="/portfolio/holdings" className="inline-flex h-10 items-center rounded-[8px] border border-slate-700 px-4 text-sm font-bold text-slate-100">Back to holdings</Link>}
       />
 
       <div className="grid gap-4 xl:grid-cols-[1fr_380px]">
