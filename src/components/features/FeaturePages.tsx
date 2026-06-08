@@ -10,6 +10,7 @@ import { buildHoldingDraft, validateHoldingDraft, type HoldingDraftInput, type H
 import { importTemplates, type ImportKind, type ImportValidationResult } from "@/lib/imports";
 import { generateReport, reportDefinitions, type GeneratedReport, type ReportType } from "@/lib/reports";
 import { formatCompactNaira, formatNaira } from "@/lib/scoring";
+import { buildTransactionDraft, validateTransactionDraft, type TransactionDraftInput, type TransactionDraftType } from "@/lib/transactionDraft";
 import { Badge, Card, Metric, ScoreBadge, SectionTitle } from "@/components/ui/Primitives";
 import { DonutChart, ScoreRing, Sparkline } from "@/components/dashboard/Charts";
 
@@ -251,7 +252,7 @@ export function PortfolioPage({ tab = "Overview" }: { tab?: string }) {
 
   return (
     <>
-      <PageHeader title="Portfolio / Wallet" description="A private ledger for holdings Tony bought manually through Stanbic IBTC Stockbrokers. The app tracks and explains; it never places trades." action={<Link href="/portfolio/holdings/new" className="inline-flex h-10 items-center gap-2 rounded-[8px] bg-emerald-600 px-4 text-sm font-bold text-white"><Plus size={16} /> Add holding</Link>} />
+      <PageHeader title="Portfolio / Wallet" description="A private ledger for holdings Tony bought manually through Stanbic IBTC Stockbrokers. The app tracks and explains; it never places trades." action={tab === "Transactions" ? <Link href="/portfolio/transactions/new" className="inline-flex h-10 items-center gap-2 rounded-[8px] bg-emerald-600 px-4 text-sm font-bold text-white"><Plus size={16} /> Add transaction</Link> : <Link href="/portfolio/holdings/new" className="inline-flex h-10 items-center gap-2 rounded-[8px] bg-emerald-600 px-4 text-sm font-bold text-white"><Plus size={16} /> Add holding</Link>} />
       <div className="mb-4 flex gap-2 overflow-x-auto thin-scrollbar">
         {nav.map(([label, href]) => <a key={label} href={href} className={`shrink-0 rounded-[8px] border px-3 py-2 text-sm font-bold ${label === tab ? "border-emerald-400 bg-emerald-500/15 text-white" : "border-slate-700 text-slate-400"}`}>{label}</a>)}
       </div>
@@ -608,6 +609,116 @@ function IssueList({ title, issues, tone }: { title: string; issues: string[]; t
 
 function TransactionsTable() {
   return <Card><SectionTitle>Transaction Ledger</SectionTitle><div className="space-y-3">{transactions.map((item) => <div key={item.id} className="soft-panel grid gap-2 rounded-[8px] p-3 text-sm md:grid-cols-6"><span className="font-bold text-white">{item.date}</span><span>{item.symbol}</span><span>{item.type}</span><span>{item.quantity.toLocaleString()}</span><span>{formatCompactNaira(item.netAmount)}</span><span className="text-slate-400">{item.reference}</span></div>)}</div></Card>;
+}
+
+const transactionTypes: TransactionDraftType[] = ["Buy", "Sell", "Dividend Received", "Bonus Shares", "Rights Issue", "Stock Split", "Fee/Charge", "Manual Adjustment", "Transfer Between Brokers"];
+
+export function AddTransactionPage() {
+  const [form, setForm] = useState<TransactionDraftInput>({
+    symbol: "GTCO",
+    type: "Buy",
+    transactionDate: "2026-06-08",
+    settlementDate: "2026-06-11",
+    quantity: 1000,
+    price: 72.5,
+    charges: 1500,
+    withholdingTax: 0,
+    reference: "SIBTC-CN-NEW",
+    notes: "Manual Stanbic IBTC transaction record.",
+    uploadedDocumentPath: "data/documents/",
+  });
+  const draft = buildTransactionDraft(form);
+  const issues = validateTransactionDraft(draft);
+  const errors = issues.filter((issue) => issue.severity === "error");
+  const warnings = issues.filter((issue) => issue.severity === "warning");
+
+  function updateField<K extends keyof TransactionDraftInput>(field: K, value: TransactionDraftInput[K]) {
+    setForm((current) => ({ ...current, [field]: value }));
+  }
+
+  return (
+    <>
+      <PageHeader
+        title="Add Transaction"
+        description="Record a completed portfolio movement from Stanbic IBTC. This is a local ledger draft only; it never sends broker instructions or places trades."
+        action={<Link href="/portfolio/transactions" className="inline-flex h-10 items-center rounded-[8px] border border-slate-700 px-4 text-sm font-bold text-slate-100">Back to transactions</Link>}
+      />
+
+      <div className="grid gap-4 xl:grid-cols-[1fr_380px]">
+        <Card>
+          <SectionTitle action={<Badge tone={draft.dataStatus === "linked" ? "positive" : "warning"}>{draft.dataStatus === "linked" ? "Linked" : "Incomplete"}</Badge>}>Transaction Entry</SectionTitle>
+          <div className="grid gap-4 md:grid-cols-2">
+            <FormField label="Transaction type">
+              <select className={fieldClass} value={form.type} onChange={(event) => updateField("type", event.target.value as TransactionDraftType)}>
+                {transactionTypes.map((type) => <option key={type}>{type}</option>)}
+              </select>
+            </FormField>
+            <FormField label="Stock symbol">
+              <input className={fieldClass} value={form.symbol} onChange={(event) => updateField("symbol", event.target.value)} />
+            </FormField>
+            <FormField label="Broker">
+              <input className={fieldClass} value={draft.broker} onChange={(event) => updateField("broker", event.target.value)} />
+            </FormField>
+            <FormField label="Company">
+              <input className={fieldClass} value={draft.company || "Unlinked symbol"} readOnly />
+            </FormField>
+            <FormField label="Transaction date">
+              <input type="date" className={fieldClass} value={form.transactionDate} onChange={(event) => updateField("transactionDate", event.target.value)} />
+            </FormField>
+            <FormField label="Settlement date">
+              <input type="date" className={fieldClass} value={form.settlementDate ?? ""} onChange={(event) => updateField("settlementDate", event.target.value)} />
+            </FormField>
+            <FormField label="Quantity">
+              <input type="number" min="0" className={fieldClass} value={form.quantity} onChange={(event) => updateField("quantity", Number(event.target.value))} />
+            </FormField>
+            <FormField label="Price / amount per share">
+              <input type="number" min="0" step="0.01" className={fieldClass} value={form.price} onChange={(event) => updateField("price", Number(event.target.value))} />
+            </FormField>
+            <FormField label="Charges">
+              <input type="number" min="0" step="0.01" className={fieldClass} value={form.charges ?? 0} onChange={(event) => updateField("charges", Number(event.target.value))} />
+            </FormField>
+            <FormField label="Withholding tax">
+              <input type="number" min="0" step="0.01" className={fieldClass} value={form.withholdingTax ?? 0} onChange={(event) => updateField("withholdingTax", Number(event.target.value))} />
+            </FormField>
+            <FormField label="Reference number">
+              <input className={fieldClass} value={form.reference ?? ""} onChange={(event) => updateField("reference", event.target.value)} />
+            </FormField>
+            <FormField label="Uploaded document path">
+              <input className={fieldClass} value={form.uploadedDocumentPath ?? ""} onChange={(event) => updateField("uploadedDocumentPath", event.target.value)} />
+            </FormField>
+            <div className="md:col-span-2">
+              <FormField label="Notes">
+                <textarea className={`${fieldClass} min-h-28 resize-none py-3`} value={form.notes ?? ""} onChange={(event) => updateField("notes", event.target.value)} />
+              </FormField>
+            </div>
+          </div>
+        </Card>
+
+        <div className="space-y-4">
+          <Card>
+            <SectionTitle>Ledger Effect</SectionTitle>
+            <div className="grid gap-4">
+              <Metric label="Gross amount" value={formatCompactNaira(draft.grossAmount)} />
+              <Metric label="Net amount" value={formatCompactNaira(draft.netAmount)} tone={draft.type === "Dividend Received" ? "positive" : "neutral"} />
+              <Metric label="Quantity change" value={draft.effect.quantityChange.toLocaleString()} tone={draft.effect.quantityChange >= 0 ? "positive" : "danger"} />
+              <Metric label="Cost basis change" value={formatCompactNaira(draft.effect.costBasisChange)} />
+              <Metric label="Income change" value={formatCompactNaira(draft.effect.incomeChange)} tone={draft.effect.incomeChange > 0 ? "positive" : "neutral"} />
+            </div>
+          </Card>
+
+          <Card>
+            <SectionTitle>Validation</SectionTitle>
+            {issues.length === 0 && <div className="soft-panel rounded-[8px] p-4 text-sm text-emerald-200">Ready to save locally when persistence is enabled. Broker execution remains manual through Stanbic IBTC.</div>}
+            {errors.length > 0 && <IssueList title="Errors" issues={errors.map((issue) => issue.message)} tone="danger" />}
+            {warnings.length > 0 && <IssueList title="Warnings" issues={warnings.map((issue) => issue.message)} tone="warning" />}
+            <div className="mt-4 soft-panel rounded-[8px] p-4 text-sm leading-6 text-slate-300">
+              Buy and rights issue entries increase quantity and cost basis. Dividend entries increase income only. Bonus shares increase quantity without cost.
+            </div>
+          </Card>
+        </div>
+      </div>
+    </>
+  );
 }
 
 function DividendsPanel() {
