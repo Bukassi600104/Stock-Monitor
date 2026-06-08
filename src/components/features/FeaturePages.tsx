@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { AlertTriangle, ArrowRight, Bot, CheckCircle2, Download, FileText, Filter, Plus, Upload } from "lucide-react";
 import { alerts, aiBriefing, brokerSetup, documents, holdings, portfolio, sectors, stocks, transactions, watchlist } from "@/lib/data";
 import { importTemplates, type ImportKind, type ImportValidationResult } from "@/lib/imports";
+import { generateReport, reportDefinitions, type GeneratedReport, type ReportType } from "@/lib/reports";
 import { formatCompactNaira, formatNaira } from "@/lib/scoring";
 import { Badge, Card, Metric, ScoreBadge, SectionTitle } from "@/components/ui/Primitives";
 import { DonutChart, ScoreRing, Sparkline } from "@/components/dashboard/Charts";
@@ -340,7 +341,87 @@ export function AssistantPage() {
 }
 
 export function ReportsPage() {
-  return <><PageHeader title="Reports" description="Generate local market and portfolio reports for review. PDF export can be added later; CSV and Markdown are first-class V1 formats." action={<button className="inline-flex h-10 items-center gap-2 rounded-[8px] bg-blue-600 px-4 text-sm font-bold text-white"><Download size={16} /> Export Markdown</button>} /><div className="grid grid-auto-fit gap-4">{["Daily Market Briefing", "Dividend Income Report", "Holdings Review Report", "Portfolio Risk Report", "Monthly Portfolio Review"].map((report) => <Card key={report}><h2 className="text-xl font-black text-white">{report}</h2><p className="mt-3 text-sm text-slate-400">Ready to generate from local seeded data and future SQLite records.</p></Card>)}</div></>;
+  const [reportType, setReportType] = useState<ReportType>("daily-market-briefing");
+  const [report, setReport] = useState<GeneratedReport>(() => generateReport("daily-market-briefing"));
+
+  function selectReport(nextType: ReportType) {
+    setReportType(nextType);
+    setReport(generateReport(nextType));
+  }
+
+  return (
+    <>
+      <PageHeader
+        title="Reports"
+        description="Generate structured local market and portfolio reports for review. Markdown, CSV, and JSON backup exports are available now; PDF remains a later formatter."
+        action={
+          <div className="flex flex-wrap gap-2">
+            <a href={`/api/reports?type=${reportType}&format=markdown&download=true`} className="inline-flex h-10 items-center gap-2 rounded-[8px] bg-blue-600 px-4 text-sm font-bold text-white">
+              <Download size={16} /> Markdown
+            </a>
+            <a href={`/api/reports?type=${reportType}&format=csv&download=true`} className="inline-flex h-10 items-center gap-2 rounded-[8px] border border-slate-700 px-4 text-sm font-bold text-slate-100">
+              CSV
+            </a>
+            <a href={`/api/reports?type=${reportType}&format=json&download=true`} className="inline-flex h-10 items-center gap-2 rounded-[8px] border border-slate-700 px-4 text-sm font-bold text-slate-100">
+              JSON
+            </a>
+          </div>
+        }
+      />
+
+      <div className="grid gap-4 xl:grid-cols-[420px_1fr]">
+        <Card>
+          <SectionTitle>Report Types</SectionTitle>
+          <div className="space-y-3">
+            {reportDefinitions.map((definition) => (
+              <button
+                key={definition.id}
+                onClick={() => selectReport(definition.id)}
+                className={`soft-panel w-full rounded-[8px] p-4 text-left transition hover:bg-slate-800/60 ${reportType === definition.id ? "border-blue-400/60 bg-blue-500/10" : ""}`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-black text-white">{definition.title}</div>
+                    <div className="mt-2 text-xs leading-5 text-slate-400">{definition.description}</div>
+                  </div>
+                  <Badge tone={definition.cadence === "Daily" ? "positive" : definition.cadence === "Weekly" ? "primary" : "neutral"}>{definition.cadence}</Badge>
+                </div>
+              </button>
+            ))}
+          </div>
+        </Card>
+
+        <div className="space-y-4">
+          <Card>
+            <SectionTitle action={<Badge tone="positive">Generated locally</Badge>}>Report Preview</SectionTitle>
+            <div className="flex flex-col justify-between gap-4 border-b border-slate-800 pb-4 md:flex-row md:items-end">
+              <div>
+                <h2 className="text-2xl font-black text-white">{report.title}</h2>
+                <p className="mt-2 text-sm text-slate-400">Generated: {report.generatedAt}</p>
+              </div>
+              <div className="text-sm text-slate-300">No broker login, no trade execution, local research only.</div>
+            </div>
+            <p className="mt-4 text-sm leading-6 text-slate-300">{report.summary}</p>
+          </Card>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            {report.sections.map((section) => (
+              <Card key={section.title}>
+                <SectionTitle>{section.title}</SectionTitle>
+                <div className="space-y-3">
+                  {section.lines.slice(0, 5).map((line) => (
+                    <div key={line} className="soft-panel rounded-[8px] p-3 text-sm leading-5 text-slate-300">
+                      {line}
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </div>
+    </>
+  );
 }
 
 export function ImportsPage() {
