@@ -1,13 +1,9 @@
 import { NextResponse } from "next/server";
-import { aiBriefing } from "@/lib/data";
+import { answerAssistant } from "@/lib/assistant";
 
-export async function POST() {
-  return NextResponse.json({
-    answer: aiBriefing,
-    guardrails: [
-      "Uses available local market and portfolio data only.",
-      "Does not place trades or issue direct buy/sell instructions.",
-      "Discloses stale or missing data when live integrations are absent.",
-    ],
-  });
+export async function POST(request: Request) {
+  const body = (await request.json().catch(() => ({}))) as { question?: unknown };
+  const question = typeof body.question === "string" ? body.question : "";
+
+  return NextResponse.json(answerAssistant(question));
 }

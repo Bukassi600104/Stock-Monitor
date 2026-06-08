@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { AlertTriangle, ArrowRight, Bot, CheckCircle2, Download, FileText, Filter, Plus, Upload } from "lucide-react";
-import { alerts, aiBriefing, brokerSetup, documents, holdings, portfolio, sectors, stocks, transactions, watchlist } from "@/lib/data";
+import { alerts, brokerSetup, documents, holdings, portfolio, sectors, stocks, transactions, watchlist } from "@/lib/data";
+import type { AssistantAnswer } from "@/lib/assistant";
 import { importTemplates, type ImportKind, type ImportValidationResult } from "@/lib/imports";
 import { generateReport, reportDefinitions, type GeneratedReport, type ReportType } from "@/lib/reports";
 import { formatCompactNaira, formatNaira } from "@/lib/scoring";
@@ -336,8 +337,109 @@ export function AlertsPage() {
 }
 
 export function AssistantPage() {
-  const [answer, setAnswer] = useState(aiBriefing);
-  return <><PageHeader title="AI Assistant" description="Ask about the local market snapshot or portfolio. Responses are constrained to available data and do not issue direct buy/sell instructions." /><Card><div className="flex gap-3"><input className="h-11 min-w-0 flex-1 rounded-[8px] border border-slate-700 bg-slate-950 px-4 text-sm outline-none" placeholder="Compare GTCO with Zenith and UBA..." /><button onClick={() => setAnswer("GTCO has the highest opportunity score and liquidity, Zenith has similar dividend strength with a slightly cheaper valuation, and UBA is cheaper but carries more cross-border risk. Research all three before any manual decision through Stanbic IBTC.")} className="inline-flex h-11 items-center gap-2 rounded-[8px] bg-indigo-600 px-4 text-sm font-bold text-white"><Bot size={17} /> Ask</button></div><div className="mt-5 soft-panel rounded-[8px] p-4 text-sm leading-6 text-slate-300">{answer}</div></Card></>;
+  const samplePrompts = ["Compare GTCO with Zenith and UBA", "Am I overexposed to banking?", "Which holding needs attention?", "Give me a dividend market briefing"];
+  const [question, setQuestion] = useState(samplePrompts[0]);
+  const [result, setResult] = useState<AssistantAnswer | null>(null);
+  const [status, setStatus] = useState<"idle" | "asking" | "failed">("idle");
+
+  async function askAssistant(nextQuestion = question) {
+    const trimmed = nextQuestion.trim();
+    if (!trimmed) return;
+
+    setQuestion(trimmed);
+    setStatus("asking");
+
+    try {
+      const response = await fetch("/api/assistant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: trimmed }),
+      });
+
+      if (!response.ok) throw new Error("Assistant request failed");
+
+      const payload = (await response.json()) as AssistantAnswer;
+      setResult(payload);
+      setStatus("idle");
+    } catch {
+      setStatus("failed");
+    }
+  }
+
+  return (
+    <>
+      <PageHeader title="AI Assistant" description="Ask about the local market snapshot or portfolio. Responses are constrained to available data and do not issue direct buy/sell instructions." />
+      <div className="grid gap-4 xl:grid-cols-[420px_1fr]">
+        <Card>
+          <SectionTitle action={<Badge tone="primary">Local data</Badge>}>Ask</SectionTitle>
+          <form
+            className="space-y-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              askAssistant();
+            }}
+          >
+            <textarea
+              className="min-h-32 w-full resize-none rounded-[8px] border border-slate-700 bg-slate-950 px-4 py-3 text-sm leading-6 text-slate-100 outline-none transition focus:border-blue-400"
+              value={question}
+              onChange={(event) => setQuestion(event.target.value)}
+              placeholder="Compare GTCO with Zenith and UBA..."
+            />
+            <button disabled={status === "asking"} className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-[8px] bg-indigo-600 px-4 text-sm font-bold text-white transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60">
+              <Bot size={17} /> {status === "asking" ? "Analyzing..." : "Ask Assistant"}
+            </button>
+          </form>
+
+          <div className="mt-5 space-y-2">
+            {samplePrompts.map((prompt) => (
+              <button
+                key={prompt}
+                onClick={() => askAssistant(prompt)}
+                className="soft-panel w-full rounded-[8px] p-3 text-left text-sm font-semibold text-slate-200 transition hover:border-blue-400/60 hover:bg-blue-500/10"
+              >
+                {prompt}
+              </button>
+            ))}
+          </div>
+        </Card>
+
+        <div className="space-y-4">
+          <Card>
+            <SectionTitle action={result ? <Badge tone={result.suggestedLabel === "Review" ? "warning" : result.suggestedLabel === "Needs data" ? "danger" : "positive"}>{result.suggestedLabel}</Badge> : undefined}>Response</SectionTitle>
+            {status === "failed" && <div className="soft-panel rounded-[8px] border-red-500/50 bg-red-500/10 p-4 text-sm text-red-200">The assistant could not complete that request. Try again with a portfolio, sector, or scanned-stock question.</div>}
+            {!result && status !== "failed" && <div className="soft-panel rounded-[8px] p-4 text-sm leading-6 text-slate-300">Ask a question or choose a prompt to generate a local, evidence-backed response. The assistant will only use the current app data snapshot.</div>}
+            {result && (
+              <div className="space-y-4">
+                <div className="soft-panel rounded-[8px] p-4 text-sm leading-6 text-slate-200">{result.answer}</div>
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <AssistantList title="Facts" items={result.facts} tone="text-emerald-300" />
+                  <AssistantList title="Interpretation" items={result.interpretation} tone="text-blue-300" />
+                  <AssistantList title="Risks & Missing Data" items={result.risks} tone="text-amber-300" />
+                  <AssistantList title="Guardrails" items={[result.dataStatus, ...result.guardrails]} tone="text-slate-300" />
+                </div>
+              </div>
+            )}
+          </Card>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function AssistantList({ title, items, tone }: { title: string; items: string[]; tone: string }) {
+  return (
+    <div className="soft-panel rounded-[8px] p-4">
+      <div className={`mb-3 text-xs font-black uppercase ${tone}`}>{title}</div>
+      <ul className="space-y-2 text-sm leading-6 text-slate-300">
+        {items.map((item) => (
+          <li key={item} className="flex gap-2">
+            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-500" />
+            <span>{item}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 export function ReportsPage() {
