@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { AlertTriangle, ArrowRight, Bot, CheckCircle2, Download, FileText, Filter, Plus, Upload } from "lucide-react";
 import { alerts, aiBriefing, brokerSetup, documents, holdings, portfolio, sectors, stocks, transactions, watchlist } from "@/lib/data";
+import { importTemplates, type ImportKind, type ImportValidationResult } from "@/lib/imports";
 import { formatCompactNaira, formatNaira } from "@/lib/scoring";
 import { Badge, Card, Metric, ScoreBadge, SectionTitle } from "@/components/ui/Primitives";
 import { DonutChart, ScoreRing, Sparkline } from "@/components/dashboard/Charts";
@@ -343,7 +344,136 @@ export function ReportsPage() {
 }
 
 export function ImportsPage() {
-  return <><PageHeader title="Import Data" description="Import NGX prices, dividends, company reference data, portfolio transactions, and Stanbic IBTC statement metadata into local storage." action={<button className="inline-flex h-10 items-center gap-2 rounded-[8px] bg-emerald-600 px-4 text-sm font-bold text-white"><Upload size={16} /> Import CSV</button>} /><Card><SectionTitle>CSV Templates</SectionTitle><div className="grid grid-auto-fit gap-4">{["prices.csv", "dividends.csv", "stocks.csv", "portfolio_transactions.csv", "documents.csv"].map((name) => <div key={name} className="soft-panel rounded-[8px] p-4 text-sm font-bold text-white">{name}</div>)}</div></Card></>;
+  const [kind, setKind] = useState<ImportKind>("prices");
+  const [sourceName, setSourceName] = useState("Manual NGX price snapshot");
+  const [sourceType, setSourceType] = useState(importTemplates.prices.sourceType);
+  const [csv, setCsv] = useState(importTemplates.prices.csv);
+  const [result, setResult] = useState<ImportValidationResult | null>(null);
+  const [status, setStatus] = useState<"idle" | "checking" | "validated" | "needs_review" | "failed">("idle");
+  const [message, setMessage] = useState("Paste a CSV or load a template, then run quality checks before saving locally.");
+
+  function loadTemplate(nextKind: ImportKind) {
+    setKind(nextKind);
+    setSourceType(importTemplates[nextKind].sourceType);
+    setSourceName(`${importTemplates[nextKind].label} import`);
+    setCsv(importTemplates[nextKind].csv);
+    setResult(null);
+    setStatus("idle");
+    setMessage("Template loaded. Run quality checks before using it as local data.");
+  }
+
+  async function validateCsv() {
+    setStatus("checking");
+    const response = await fetch("/api/import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind, sourceName, sourceType, csv }),
+    });
+    const payload = await response.json();
+    setStatus(payload.status ?? "failed");
+    setMessage(payload.message ?? "Import validation failed.");
+    setResult(payload.result ?? null);
+  }
+
+  return (
+    <>
+      <PageHeader
+        title="Import Data"
+        description="Validate NGX prices, dividend history, company reference data, and Stanbic IBTC portfolio CSVs before they become local records."
+        action={
+          <button onClick={validateCsv} className="inline-flex h-10 items-center gap-2 rounded-[8px] bg-emerald-600 px-4 text-sm font-bold text-white">
+            <Upload size={16} /> Run quality checks
+          </button>
+        }
+      />
+
+      <div className="grid gap-4 xl:grid-cols-[360px_1fr]">
+        <Card>
+          <SectionTitle>CSV Templates</SectionTitle>
+          <div className="grid gap-3">
+            {(Object.keys(importTemplates) as ImportKind[]).map((templateKind) => (
+              <button
+                key={templateKind}
+                onClick={() => loadTemplate(templateKind)}
+                className={`soft-panel rounded-[8px] p-4 text-left transition hover:bg-slate-800/60 ${kind === templateKind ? "border-emerald-400/60 bg-emerald-500/10" : ""}`}
+              >
+                <div className="text-sm font-black text-white">{importTemplates[templateKind].label}</div>
+                <div className="mt-1 text-xs text-slate-400">{importTemplates[templateKind].sourceType}</div>
+              </button>
+            ))}
+          </div>
+
+          <SectionTitle>Data Source Manager</SectionTitle>
+          <div className="space-y-3">
+            <label className="block text-xs font-bold uppercase text-slate-500">
+              Source name
+              <input value={sourceName} onChange={(event) => setSourceName(event.target.value)} className="mt-2 h-10 w-full rounded-[8px] border border-slate-700 bg-slate-950 px-3 text-sm normal-case text-white outline-none" />
+            </label>
+            <label className="block text-xs font-bold uppercase text-slate-500">
+              Source type
+              <select value={sourceType} onChange={(event) => setSourceType(event.target.value)} className="mt-2 h-10 w-full rounded-[8px] border border-slate-700 bg-slate-950 px-3 text-sm normal-case text-white outline-none">
+                {["Manual CSV", "Stanbic IBTC Broker Export", "Broker Export", "NGX API", "Vendor API", "Custom URL"].map((type) => (
+                  <option key={type}>{type}</option>
+                ))}
+              </select>
+            </label>
+            <div className="soft-panel rounded-[8px] p-3 text-xs leading-5 text-slate-300">
+              Authentication is not required for manual CSV. API/vendor sources remain future connectors.
+            </div>
+          </div>
+        </Card>
+
+        <div className="space-y-4">
+          <Card>
+            <SectionTitle>CSV Input</SectionTitle>
+            <textarea
+              value={csv}
+              onChange={(event) => setCsv(event.target.value)}
+              spellCheck={false}
+              className="min-h-[280px] w-full resize-y rounded-[8px] border border-slate-700 bg-slate-950/70 p-4 font-mono text-xs leading-5 text-slate-100 outline-none focus:border-blue-400/70"
+            />
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="text-sm text-slate-400">{message}</div>
+              <Badge tone={status === "validated" ? "positive" : status === "needs_review" ? "warning" : status === "failed" ? "danger" : "neutral"}>{status.replace("_", " ")}</Badge>
+            </div>
+          </Card>
+
+          <Card>
+            <SectionTitle>Data Quality Checks</SectionTitle>
+            {result ? (
+              <>
+                <div className="grid grid-auto-fit gap-4">
+                  <Metric label="Rows scanned" value={`${result.rowCount}`} />
+                  <Metric label="Valid rows" value={`${result.validRows}`} tone={result.validRows > 0 ? "positive" : "neutral"} />
+                  <Metric label="Rejected rows" value={`${result.rejectedRows}`} tone={result.rejectedRows > 0 ? "danger" : "positive"} />
+                  <Metric label="Issues found" value={`${result.issues.length}`} tone={result.issues.length > 0 ? "warning" : "positive"} />
+                </div>
+                <div className="mt-4 max-h-72 space-y-2 overflow-y-auto thin-scrollbar">
+                  {result.issues.length === 0 ? (
+                    <div className="soft-panel rounded-[8px] p-4 text-sm text-emerald-300">No blocking issues found. This import is ready for the local SQLite persistence step.</div>
+                  ) : (
+                    result.issues.map((issue, index) => (
+                      <div key={`${issue.row}-${issue.field}-${index}`} className="soft-panel flex gap-3 rounded-[8px] p-3 text-sm">
+                        <Badge tone={issue.severity === "error" ? "danger" : "warning"}>{issue.severity}</Badge>
+                        <div>
+                          <div className="font-bold text-white">Row {issue.row} · {issue.field}</div>
+                          <div className="text-slate-400">{issue.message}</div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="soft-panel rounded-[8px] p-4 text-sm leading-6 text-slate-300">
+                Checks include missing symbol, duplicate symbol, invalid price, missing sector, stale date, suspicious dividend amount, zero volume, and Stanbic broker-workflow mismatches.
+              </div>
+            )}
+          </Card>
+        </div>
+      </div>
+    </>
+  );
 }
 
 export function SettingsPage() {

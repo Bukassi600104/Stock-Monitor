@@ -10,6 +10,7 @@ Local-first investment intelligence dashboard for Nigerian Exchange equities, di
 - Market scanner, sector map, screener, dividend radar, stock detail, watchlist, alerts, assistant, reports, imports, and settings pages
 - First-class Portfolio / Wallet module with overview, holdings, transactions, dividends, performance, risk/allocation, documents, and Stanbic IBTC broker setup
 - Local seeded data and scoring helpers
+- CSV import validator for stocks, prices, dividends, and Stanbic IBTC portfolio records with data-quality warnings
 - Prisma/SQLite schema for future persistent local data
 - API route stubs for refresh, stocks, sectors, scores, assistant, import, and reports
 
